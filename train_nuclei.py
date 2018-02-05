@@ -1,7 +1,7 @@
 # coding: utf-8
 
 """
-Mask R-CNN - Train on Nuclei Dataset (updated from train_shape.ipynb)
+Mask R-CNN - Train on Nuclei Dataset (Updated from train_shape.ipynb)
 
 This notebook shows how to train Mask R-CNN on your own dataset. 
 To keep things simple we use a synthetic dataset of shapes (squares, 
