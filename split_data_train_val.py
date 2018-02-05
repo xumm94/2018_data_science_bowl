@@ -1,6 +1,7 @@
 """
 Split the dataset in ./data/stage1_train into training/val set with the raitio 9:1. 
 The validation set will be saved in ./data/stage1_val
+
 """
 
 import os, random, shutil
