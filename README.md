@@ -2,6 +2,7 @@
 * Update the [train_nuclei.ipynb](train_nuclei.ipynb) form original [train_shapes.ipynb](train_shapes.ipynb).Load images and masks for our specific use.
 * It's inconvenient to train/evaluate/predict the model using the \*.ipynb, so I transfer the [train_nuclei.ipynb](train_nuclei.ipynb) into \*.py and add some args to put into the code.
 * You can use the [split_data_train_val.py](split_data_train_val.py) to split whole training set into training/validation set with the ratio(9:1).
+* [train_nuclei_multi_class.ipynb](train_nuclei_multi_class.ipynb) and [train_nuclei_multi_class.py](train_nuclei_multi_class.py) are updated form train_nuclei.\*. Add the class_id of each instance by their fore-background(refer to [classes.csv](classes.csv)).
 
 # Original README.md : Mask R-CNN for Object Detection and Segmentation
 
