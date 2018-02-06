@@ -72,7 +72,7 @@ class NucleiConfig(Config):
     # use small validation steps since the epoch is small
     VALIDATION_STEPS = 10
 
-    LEARNING_RATE = 0.00005
+    LEARNING_RATE = 0.00002
 
     # Maximum number of ground truth instances to use in one image
     MAX_GT_INSTANCES = 200
@@ -267,6 +267,7 @@ if __name__ == '__main__':
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
             GPU_COUNT = 1
             IMAGES_PER_GPU = 1
+            DETECTION_MAX_INSTANCES = 300
         config = InferenceConfig()
         config.display()
 
