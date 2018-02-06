@@ -31,6 +31,7 @@ import utils
 import model as modellib
 import visualize
 from model import log
+import logging
 
 """
 Configurations

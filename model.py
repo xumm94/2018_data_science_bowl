@@ -2175,12 +2175,31 @@ class MaskRCNN():
                                        batch_size=self.config.BATCH_SIZE,
                                        augment=False)
 
+        # learning rate scheduler
+        def step_decay(epoch):
+            drop = 0.5
+            epochs_drop = 10.0
+            return learning_rate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
+        
+        # detailed logger
+        class DetailedLogger(keras.callbacks.Callback):
+            def __init__(self, ckpt_path):
+                self.checkpoint_path = ckpt_path
+
+            def on_train_begin(self, logs={}):
+                logging.basicConfig(filename=os.path.join(self.checkpoint_path,  'training.log'), level=logging.INFO)
+
+            def on_batch_end(self, batch, logs={}):
+                logging.info('Epoch: {} | Iter: {} | LearningRate: {} | Metrics: {}'.format(self.params['epochs'], self.params['steps'], K.eval(self.model.optimizer.lr), logs))
+
         # Callbacks
         callbacks = [
             keras.callbacks.TensorBoard(log_dir=self.log_dir,
                                         histogram_freq=0, write_graph=True, write_images=False),
             keras.callbacks.ModelCheckpoint(self.checkpoint_path,
                                             verbose=0, save_weights_only=True),
+            keras.callbacks.LearningRateScheduler(step_decay, verbose=1),
+            DetailedLogger(self.log_dir),
         ]
 
         # Train
