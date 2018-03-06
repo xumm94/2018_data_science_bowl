@@ -32,6 +32,7 @@ import model as modellib
 import visualize
 from model import log
 import logging
+import argparse
 
 """
 Configurations
@@ -50,15 +51,22 @@ class NucleiConfig(Config):
     # Train on 1 GPU and 8 images per GPU. We can put multiple images on each
     # GPU because the images are small. Batch size is 8 (GPUs * images/GPU).
     GPU_COUNT = 2
-    IMAGES_PER_GPU = 1
+    IMAGES_PER_GPU = 8
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + 3 shapes
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 800
-    IMAGE_MAX_DIM = 1024
+    IMAGE_MIN_DIM = 512
+    IMAGE_MAX_DIM = 512
+
+    # Number of ROIs per image to feed to classifier/mask heads
+    # The Mask RCNN paper uses 512 but often the RPN doesn't generate
+    # enough positive proposals to fill this and keep a positive:negative
+    # ratio of 1:3. You can increase the number of proposals by adjusting
+    # the RPN NMS threshold.
+    TRAIN_ROIS_PER_IMAGE = 300
 
     # Use smaller anchors because our image and objects are small
     RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor side in pixels
@@ -68,35 +76,31 @@ class NucleiConfig(Config):
     TRAIN_ROIS_PER_IMAGE = 32
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 200
+    STEPS_PER_EPOCH = 50
 
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = 10
+    VALIDATION_STEPS = 5
 
-    LEARNING_RATE = 0.00002
+    LEARNING_RATE = 0.001
 
     # Maximum number of ground truth instances to use in one image
     MAX_GT_INSTANCES = 200
 
-
-"""
-Dataset
-
-Load the nuclei dataset
-
-Extend the Dataset class and add a method to get the nuclei dataset, 
-load_image_info(), and override the following methods:
-
-* load_image()
-* load_mask()
-* image_reference()
-"""
+    def display(self, logger):
+        """Display Configuration values."""
+        print("\nConfigurations:")
+        logger.info('\nConfigurations:')
+        for a in dir(self):
+            if not a.startswith("__") and not callable(getattr(self, a)):
+                print("{:30} {}".format(a, getattr(self, a)))
+                logger.info("{:30} {}".format(a, getattr(self, a)))
+        print("\n")
 
 class NucleiDataset(utils.Dataset):
 
     """Load the images and masks from dataset."""
 
-    def load_image_info(self, set_path):
+    def load_image_info(self, data_path, img_set = None):
         """Get the picture names(ids) of the dataset."""
         
         # Add classes
@@ -105,10 +109,15 @@ class NucleiDataset(utils.Dataset):
         
         # Add images
         # Get the images ids of training/testing set
-        train_ids = next(os.walk(set_path))[1]
+        if img_set is None:
+            train_ids = next(os.walk(data_path))[1]
+        else:
+            with open(img_set) as f:
+                read_data = f.readlines()
+            train_ids = [read_data[i][:-1] for i in range(0,len(read_data))] # Delete New line '\n'
         # Get the info of the images
         for i, id_ in enumerate(train_ids):
-            file_path = os.path.join(set_path, id_)
+            file_path = os.path.join(data_path, id_)
             img_path = os.path.join(file_path, "images")
             masks_path = os.path.join(file_path, "masks")
             img_name = id_ + ".png"
@@ -146,6 +155,9 @@ class NucleiDataset(utils.Dataset):
         class_ids = np.ones(len(mask_files))
         return masks, class_ids.astype(np.int32)
 
+    # def test(self):
+    #     return "1"
+
 def rle_encoding(x):
     dots = np.where(x.T.flatten() == 1)[0]
     run_lengths = []
@@ -156,19 +168,16 @@ def rle_encoding(x):
         prev = b
     return run_lengths
 
-if __name__ == '__main__':
-    
-    import argparse
-
+def parser_argument():
     # Parse command line arguments
     parser = argparse.ArgumentParser(
         description='Train Mask R-CNN on Nuclei Dataset.')
     parser.add_argument("command",
                         metavar="<command>",
-                        help="'train' or 'evaluate'")
-    parser.add_argument('--dataset',
+                        help="'train' or 'evaluate' or predict")
+    parser.add_argument('--datapath',
                         metavar="/path/to/data/",
-                        default="/home/liangf/IVision/Mask_RCNN/data",
+                        default="./data",
                         help='Directory of the Nuclei dataset')
     parser.add_argument('--init_with',
                         metavar="/init/type",
@@ -176,35 +185,54 @@ if __name__ == '__main__':
                         help="Initialize with the (\"coco\"/\"imagenet\"/\"last\") net")
     parser.add_argument('--model',
                         metavar="/path/to/weights.h5",
-                        default="/home/liangf/IVision/Mask_RCNN/models/mask_rcnn_coco.h5",
+                        default="./models/mask_rcnn_coco.h5",
                         help="Path to weights .h5 file")
     parser.add_argument('--ckpt',
                         metavar="/path/to/save/checkpoint",
-                        default="/data2/liangfeng/nuclei_models",
+                        default="/data/lf/Nuclei/logs",
                         help="Directory of the checkpoint")
     parser.add_argument('--epochs',
                         metavar="/num/of/epochs",
-                        default="40",
+                        default="50",
                         help="The number of the training epochs")
     parser.add_argument('--finetune',
                         metavar="/finetune/type",
                         default="heads",
                         help="The type of the finetune method(\"heads\" or \"all\")")
+    parser.add_argument('--lr_start',
+                        metavar="/value/of/start/lr",
+                        default="0.001",
+                        type=float,
+                        help="The Value of learning rate to start")
+    parser.add_argument('--train_dataset',
+                        metavar="train/imgs/names",
+                        default="10-fold-train-1.txt",
+                        help="The training set split of the data")
+    parser.add_argument('--val_dataset',
+                        metavar="val/imgs/names",
+                        default="10-fold-val-1.txt",
+                        help="The validation set split of the data")
+
+    return parser.parse_args()
+
+if __name__ == '__main__':
     
-    args = parser.parse_args()
-    print("Command: ", args.command)
-    print("Initialize: ", args.init_with)
-    print("Model: ", args.model)
-    print("Dataset: ", args.dataset)
-    print("Ckpt: ", args.ckpt)
-    print("Epochs: ", args.epochs)
-    print("Finetune: ", args.finetune)
+    args = parser_argument()
+    logname = "config-" + time.strftime('%Y%m%d%H%M', time.localtime(time.time())) +".log"
+    logging.basicConfig(filename=os.path.join(args.ckpt, logname), level=logging.INFO)
+    logger = logging.getLogger('root')
+    logger.info('\nBasic Setting:')
+    logger.info('\nCommand: {} \n Initialize: {} \n Model: {} \n Datapath: {} \n Ckpt: {} \n Epochs \
+        : {} \n Finetune: {} \n Train_dataset: {} \n Val_dataset: {} \n' \
+        .format(args.command, args.init_with, args.model, args.datapath, args.ckpt,\
+            args.epochs, args.finetune, args.train_dataset, args.val_dataset))
 
     # Train or evaluate or predict
     if args.command == "train":
 
         config = NucleiConfig()
-        config.display()
+        config.LEARNING_RATE = args.lr_start
+        config.display(logger)
         model = modellib.MaskRCNN(mode="training", config=config,
                                   model_dir=args.ckpt)
         
@@ -226,15 +254,16 @@ if __name__ == '__main__':
 
         # Training dataset. Use the training set and 35K from the
         # validation set, as as in the Mask RCNN paper.
-        TRAINSET_DIR = os.path.join(args.dataset, "stage1_train")
-        VALSET_DIR = os.path.join(args.dataset, "stage1_val")
+        DATASET_DIR = os.path.join(args.datapath, "stage1_train_fixed")
+        TRAIN_IMG_SET = os.path.join(args.datapath, "stage1_train_fixed_10fold", args.train_dataset)
+        VAL_IMG_SET = os.path.join(args.datapath, "stage1_train_fixed_10fold", args.val_dataset)
 
         dataset_train = NucleiDataset()
-        dataset_train.load_image_info(TRAINSET_DIR)
+        dataset_train.load_image_info(DATASET_DIR, TRAIN_IMG_SET)
         dataset_train.prepare()
 
         dataset_val = NucleiDataset()
-        dataset_val.load_image_info(VALSET_DIR)
+        dataset_val.load_image_info(DATASET_DIR, VAL_IMG_SET)
         dataset_val.prepare()
 
         print("Loading {} training images, {} validation images"
@@ -245,21 +274,17 @@ if __name__ == '__main__':
             model.train(dataset_train, dataset_val, 
                         learning_rate=config.LEARNING_RATE, 
                         epochs=int(args.epochs), 
-                        layers='heads')
+                        layers='heads',
+                        logger=logger)
         elif args.finetune == "all":
             model.train(dataset_train, dataset_val,
                         learning_rate=config.LEARNING_RATE,
                         epochs=int(args.epochs),
-                        layers='all')
+                        layers='all',
+                        logger=logger)
         else: 
             raise NameError("Only two finetune type is vaild(\"heads\" or \"all\")")
 
-
-        # print("Training Resnet layer 4+")
-        # model.train(dataset_train, dataset_val,
-        #             learning_rate=config.LEARNING_RATE / 10,
-        #             epochs=100,
-        #             layers='4+')
 
     elif args.command == "evaluate": 
         # TODO AP in [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
