@@ -2135,7 +2135,7 @@ class MaskRCNN():
         self.checkpoint_path = self.checkpoint_path.replace(
             "*epoch*", "{epoch:04d}")
 
-    def train(self, train_dataset, val_dataset, learning_rate, epochs, layers):
+    def train(self, train_dataset, val_dataset, learning_rate, epochs, layers, logger):
         """Train the model.
         train_dataset, val_dataset: Training and validation Dataset objects.
         learning_rate: The learning rate to train with
@@ -2170,15 +2170,16 @@ class MaskRCNN():
 
         # Data generators
         train_generator = data_generator(train_dataset, self.config, shuffle=True,
-                                         batch_size=self.config.BATCH_SIZE)
+                                         batch_size=self.config.BATCH_SIZE,
+                                         augment=True)
         val_generator = data_generator(val_dataset, self.config, shuffle=True,
                                        batch_size=self.config.BATCH_SIZE,
-                                       augment=False)
+                                       augment=True)
 
         # learning rate scheduler
         def step_decay(epoch):
-            drop = 0.5
-            epochs_drop = 10.0
+            drop = 0.2
+            epochs_drop = 5.0
             return learning_rate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
         
         # detailed logger
@@ -2186,18 +2187,21 @@ class MaskRCNN():
             def __init__(self, ckpt_path):
                 self.checkpoint_path = ckpt_path
 
-            def on_train_begin(self, logs={}):
-                logging.basicConfig(filename=os.path.join(self.checkpoint_path,  'training.log'), level=logging.INFO)
+            # def on_train_begin(self, logs={}):
+            #     logging.basicConfig(filename=os.path.join(self.checkpoint_path,  'training.log'), level=logging.INFO)
 
-            def on_batch_end(self, batch, logs={}):
-                logging.info('Epoch: {} | Iter: {} | LearningRate: {} | Metrics: {}'.format(self.params['epochs'], self.params['steps'], K.eval(self.model.optimizer.lr), logs))
+            def on_epoch_end(self, batch, logs={}):
+                logger.info('Epoch: {} \n Iter: {} \n LearningRate: {} \n Metrics: {} \n' \
+                    .format(self.params['epochs'], self.params['steps'], \
+                    K.eval(self.model.optimizer.lr), logs))
 
         # Callbacks
         callbacks = [
             keras.callbacks.TensorBoard(log_dir=self.log_dir,
                                         histogram_freq=0, write_graph=True, write_images=False),
             keras.callbacks.ModelCheckpoint(self.checkpoint_path,
-                                            verbose=0, save_weights_only=True),
+                                            verbose=0, save_weights_only=True,
+                                            period=5),
             keras.callbacks.LearningRateScheduler(step_decay, verbose=1),
             DetailedLogger(self.log_dir),
         ]
