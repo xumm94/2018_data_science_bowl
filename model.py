@@ -30,6 +30,7 @@ import keras.models as KM
 
 import utils
 
+import cv2
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
@@ -1174,7 +1175,16 @@ def load_image_gt(dataset, config, image_id, augment=False,
         if random.randint(0, 1):
             image = np.fliplr(image)
             mask = np.fliplr(mask)
-
+        if random.randint(0, 1):
+            image = np.flipud(image)
+            mask = np.flipud(image)
+        if random.randint(0, 1):
+            image = cv2.resize(image,None,fx=1.1, fy=1.1, interpolation = cv2.INTER_LINEAR)
+            mask = cv2.resize(mask,None,fx=1.1, fy=1.1, interpolation = cv2.INTER_LINEAR) 
+        if random.randint(0,1):
+            image = randomRotation(image)
+            mask = randomRotation(mask) 
+                     
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
     # bbox: [num_instances, (y1, x1, y2, x2)]
@@ -1196,6 +1206,12 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     return image, image_meta, class_ids, bbox, mask
 
+def randomRotation(self, img):
+#       random_angle = random.randint(1, 360)
+        random_angle = 45
+        rotation_matrix = cv2.getRotationMatrix2D((img.shape[1] // 2, img.shape[0] // 2), random_angle, 1)
+        img_rotation = cv2.warpAffine(img, rotation_matrix, (img.shape[1], img.shape[0]))
+        return img_rotation
 
 def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
     """Generate targets for training Stage 2 classifier and mask heads.
