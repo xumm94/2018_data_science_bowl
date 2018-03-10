@@ -27,7 +27,7 @@ import keras.layers as KL
 import keras.initializers as KI
 import keras.engine as KE
 import keras.models as KM
-
+from keras.preprocessing import image
 import utils
 
 import cv2
@@ -1180,11 +1180,10 @@ def load_image_gt(dataset, config, image_id, augment=False,
             mask = np.flipud(image)
         if random.randint(0, 1):
             image = cv2.resize(image,None,fx=1.1, fy=1.1, interpolation = cv2.INTER_LINEAR)
-            mask = cv2.resize(mask,None,fx=1.1, fy=1.1, interpolation = cv2.INTER_LINEAR) 
+            mask = cv2.resize(mask,None,fx=1.1, fy=1.1, interpolation = cv2.INTER_LINEAR)  
         if random.randint(0,1):
-            image = randomRotation(image)
-            mask = randomRotation(mask) 
-                     
+            image = shear(image)
+            mask = shear(mask)                   
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
     # bbox: [num_instances, (y1, x1, y2, x2)]
@@ -1206,12 +1205,19 @@ def load_image_gt(dataset, config, image_id, augment=False,
 
     return image, image_meta, class_ids, bbox, mask
 
-def randomRotation(self, img):
-#       random_angle = random.randint(1, 360)
-        random_angle = 45
-        rotation_matrix = cv2.getRotationMatrix2D((img.shape[1] // 2, img.shape[0] // 2), random_angle, 1)
-        img_rotation = cv2.warpAffine(img, rotation_matrix, (img.shape[1], img.shape[0]))
-        return img_rotation
+# def rotate(self,img, angle = 90,row_axis=0, col_axis=1, channel_axis=2, fill_mode='nearest', cval=0.):
+#     theta = np.pi / 180 * angle
+#     rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],[np.sin(theta), np.cos(theta), 0],[0, 0, 1]])
+#     h, w = img.shape[row_axis], img.shape[col_axis]
+#     transform_matrix = image.transform_matrix_offset_center(rotation_matrix, h, w)
+#     img = image.apply_transform(img, transform_matrix, channel_axis, fill_mode, cval)
+#     return img
+def shear(self,img, shear = 0.1, row_axis=0, col_axis=1, channel_axis=2, fill_mode='nearest', cval=0.):     
+    shear_matrix = np.array([[1, -np.sin(shear), 0],[0, np.cos(shear), 0],[0, 0, 1]])
+    h, w = img.shape[row_axis], img.shape[col_axis]
+    transform_matrix = image.transform_matrix_offset_center(shear_matrix, h, w)
+    img = image.apply_transform(img, transform_matrix, channel_axis, fill_mode, cval)
+    return img
 
 def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
     """Generate targets for training Stage 2 classifier and mask heads.
